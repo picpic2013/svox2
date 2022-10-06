@@ -3,3 +3,10 @@ __pycache__/
 *$py.class
 Session.vim
 ckpt/
+
+.eggs
+.vscode
+build
+checkpoints
+data
+*.egg-info

@@ -679,6 +679,8 @@ class SparseGrid(nn.Module):
 
         gsz = self._grid_size()
         gsz_cu = gsz.to(device=dirs.device)
+        # !!!!
+        # gsz = gsz_cu
         t1 = (-0.5 - origins) * invdirs
         t2 = (gsz_cu - 0.5 - origins) * invdirs
 
@@ -1156,6 +1158,8 @@ class SparseGrid(nn.Module):
         :return: (H, W, 3), predicted RGB image
         """
         imrend_fn_name = f"volume_render_{self.opt.backend}_image"
+        # !!!
+        # if False:
         if self.basis_type != BASIS_TYPE_MLP and imrend_fn_name in _C.__dict__ and not torch.is_grad_enabled() and not return_raylen:
             # Use the fast image render kernel if available
             cu_fn = _C.__dict__[imrend_fn_name]

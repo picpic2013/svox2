@@ -4,7 +4,7 @@ echo Launching experiment $1
 echo GPU $2
 echo EXTRA ${@:3}
 
-CKPT_DIR=ckpt/$1
+CKPT_DIR=checkpoints/$1
 mkdir -p $CKPT_DIR
 NOHUP_FILE=$CKPT_DIR/log
 echo CKPT $CKPT_DIR
