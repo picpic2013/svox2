@@ -1,4 +1,5 @@
 from .nerf_dataset import NeRFDataset
+from .nerf_dataset_split import NeRFDatasetSplit
 from .llff_dataset import LLFFDataset
 from .nsvf_dataset import NSVFDataset
 from .co3d_dataset import CO3DDataset
@@ -21,6 +22,7 @@ def auto_dataset(root : str, *args, **kwargs):
 
 datasets = {
     'nerf': NeRFDataset,
+    'nerf_split': NeRFDatasetSplit, 
     'llff': LLFFDataset,
     'nsvf': NSVFDataset,
     'co3d': CO3DDataset,

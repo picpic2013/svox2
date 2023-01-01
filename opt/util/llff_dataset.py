@@ -85,7 +85,7 @@ class LLFFDataset(DatasetBase):
         for i, ind in enumerate(self.sfm.imgs):
             img = self.sfm.imgs[ind]
             img_train_split = ind % hold_every > 0
-            if is_train_split == img_train_split:
+            if hold_every < 0 or is_train_split == img_train_split:
                 self.imgs.append(img)
         self.is_train_split = is_train_split
 

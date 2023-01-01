@@ -1,0 +1,17 @@
+# custom cmd args
+- dataset_type
+  - type: string
+  - option
+    - nerf_split: lego test dataset and split by mod 2
+- ucb_sample
+  - type: bool
+  - whether use ucb to sample topK rays to train + store loss
+- ucb_factor
+  - type: float
+  - default: 1e-5
+- output_all_after_iter
+  - type: int
+  - output full test dataset after some iters
+- start_topk_over_psnr
+  - type: float
+  - after psnr is larger than the arg, start topk operation

@@ -394,10 +394,13 @@ def load_llff_data(
 
     render_poses = np.array(render_poses).astype(np.float32)
     # reference_view_id should stay in train set only
-    validation_ids = np.arange(poses.shape[0])
-    validation_ids[::split_train_val] = -1
-    validation_ids = validation_ids < 0
-    train_ids = np.logical_not(validation_ids)
+    if split_train_val >= 0:
+        validation_ids = np.arange(poses.shape[0])
+        validation_ids[::split_train_val] = -1
+        validation_ids = validation_ids < 0
+        train_ids = np.logical_not(validation_ids)
+    else:
+        train_ids = np.ones(poses.shape[0], dtype=np.int32)
     train_poses = poses[train_ids]
     train_bds = bds[train_ids]
     c2w = poses_avg(train_poses)

@@ -171,6 +171,49 @@ with torch.no_grad():
     frames = []
     #  im_gt_all = dset.gt.to(device=device)
 
+    # with open('/home/wjk/workspace/PyProject/LLFF/data/TeaRoom_waving/outputs/test_path.txt') as f:
+    #     lines = f.read().strip().split('\n')
+    #     lines = [[float(__) for __ in _.strip().split(' ')] for _ in lines]
+
+    #     os.system('rm -rf outputs/imgs')
+    #     os.system('mkdir outputs/imgs')
+
+    #     for idx, (tmp) in enumerate(lines[1:]):
+    #         a11, a12, a13, a21, a22, a23, a31, a32, a33, x1, x2, x3, imgH, imgW, x4 = tmp
+    #         # c2w = torch.tensor([
+    #         #     [a11, a12, a13, x1*1e-3], 
+    #         #     [a21, a22, a23, x2*1e-3], 
+    #         #     [a31, a32, a33, x3*1e-3], 
+    #         #     [  0,   0,   0,  1], 
+    #         # ], device=c2ws[0].device)
+
+    #         c2w = torch.tensor([
+    #             [a11, a21, a31, x1*1e-1], 
+    #             [a12, a22, a32, x2*1e-1], 
+    #             [a13, a23, a33, x3*1e-1], 
+    #             [  0,   0,   0,  1], 
+    #         ], device=c2ws[0].device)
+
+    #         # cam = svox2.Camera(c2w, x4, width=int(imgW), height=int(imgH))
+    #         dset_h, dset_w = dset.get_image_size(0)
+    #         cam = svox2.Camera(c2w, 
+    #             fx=dset.intrins.get('fx', 0) * 1e-1, 
+    #             fy=dset.intrins.get('fy', 0) * 1e-1, 
+    #             cx=dset.intrins.get('cx', 0), 
+    #             cy=dset.intrins.get('cy', 0), 
+    #             width=int(dset_w), 
+    #             height=int(dset_h), 
+    #             # ndc_coeffs=dset.ndc_coeffs
+    #         )
+    #         im = grid.volume_render_image(cam, use_kernel=True, return_raylen=args.ray_len)
+    #         im = im.cpu().numpy() * 255
+    #         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    #         cv2.imwrite('outputs/imgs/{:03d}.jpg'.format(idx), im[::-1,:,:])
+    #         print(idx)
+
+    #     os.system('/home/zhd/project/ffmpeg/ffmpeg -y -f image2 -i outputs/imgs/%03d.jpg -c:v libx264 -crf 20 outputs/video.mp4')
+    #     exit(0)
+
     for img_id in tqdm(range(0, n_images, img_eval_interval)):
         dset_h, dset_w = dset.get_image_size(img_id)
         im_size = dset_h * dset_w
@@ -184,7 +227,11 @@ with torch.no_grad():
                            dset.intrins.get('cy', img_id) + (h - dset_h) * 0.5,
                            w, h,
                            ndc_coeffs=dset.ndc_coeffs)
-        im = grid.volume_render_image(cam, use_kernel=True, return_raylen=args.ray_len)
+        
+        with Timing("render"):
+            im = grid.volume_render_image(cam, use_kernel=True, return_raylen=args.ray_len)
+        
+        
         if args.ray_len:
             minv, meanv, maxv = im.min().item(), im.mean().item(), im.max().item()
             im = viridis_cmap(im.cpu().numpy())

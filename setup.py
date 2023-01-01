@@ -8,11 +8,11 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 ROOT_DIR = osp.dirname(osp.abspath(__file__))
 
 __version__ = None
-exec(open('svox2/version.py', 'r').read())
+exec(open('svox2_src/version.py', 'r').read())
 
 CUDA_FLAGS = []
 INSTALL_REQUIREMENTS = []
-include_dirs = [osp.join(ROOT_DIR, "svox2", "csrc", "include")]
+include_dirs = [osp.join(ROOT_DIR, "svox2_src", "csrc", "include")]
 
 # From PyTorch3D
 cub_home = os.environ.get("CUB_HOME", None)
@@ -36,14 +36,14 @@ else:
 try:
     ext_modules = [
         CUDAExtension('svox2.csrc', [
-            'svox2/csrc/svox2.cpp',
-            'svox2/csrc/svox2_kernel.cu',
-            'svox2/csrc/render_lerp_kernel_cuvol.cu',
-            'svox2/csrc/render_lerp_kernel_nvol.cu',
-            'svox2/csrc/render_svox1_kernel.cu',
-            'svox2/csrc/misc_kernel.cu',
-            'svox2/csrc/loss_kernel.cu',
-            'svox2/csrc/optim_kernel.cu',
+            'svox2_src/csrc/svox2.cpp',
+            'svox2_src/csrc/svox2_kernel.cu',
+            'svox2_src/csrc/render_lerp_kernel_cuvol.cu',
+            'svox2_src/csrc/render_lerp_kernel_nvol.cu',
+            'svox2_src/csrc/render_svox1_kernel.cu',
+            'svox2_src/csrc/misc_kernel.cu',
+            'svox2_src/csrc/loss_kernel.cu',
+            'svox2_src/csrc/optim_kernel.cu',
         ], include_dirs=include_dirs,
         optional=False),
     ]
@@ -62,6 +62,9 @@ setup(
     ext_modules=ext_modules,
     setup_requires=['pybind11>=2.5.0'],
     packages=['svox2', 'svox2.csrc'],
+    package_dir={
+        'svox2': 'svox2_src'
+    }, 
     cmdclass={'build_ext': BuildExtension},
     zip_safe=False,
 )

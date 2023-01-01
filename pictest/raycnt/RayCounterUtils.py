@@ -19,7 +19,7 @@ class RayCounter:
         self.grid = grid
         self.counts = torch.zeros_like(grid.links)
 
-    def countAndSave(self, path, rays: Rays, addToTotal: bool=True, countGrid: torch.Tensor=None, rayLoss: torch.Tensor=None, iters: int=1, eps=1e-8, spreadMeanRayLoss=True, extraInfo: dict=None):
+    def countAndSave(self, path, rays: Rays, addToTotal: bool=True, countGrid: torch.Tensor=None, rayLoss: torch.Tensor=None, iters: int=1, eps=1e-8, spreadMode='SIGMA', extraInfo: dict=None):
         '''
         @param path: save path (should be better if end with .npy)
         @param rays: Rays (Origins + Dirs)
@@ -28,7 +28,10 @@ class RayCounter:
         @param rayLoss:   spread ray loss evenly to its passing grid (without distance weight) [B]
         @param iters: rayLoss spread iters (just leave it as default)
         @param eps: a very small number to prevent divide by 0
-        @param spreadMeanRayLoss: if True, spread (ray loss / passed grid cnt) to grid, else spread (ray loss) directly
+        @param spreadMode: [ SUM | MEAN | SIGMA ] 
+            SUM:  spread (ray loss) directly
+            MEAN: spread (ray loss / passed grid cnt) to grid
+            SIGMA: spread ray loss the same way as rendering (weight is cumulated sigma)
         @param extraInfo: extra info that you want to save in .npy file (will OVERWRITE the output result if have key confliction)
 
         @returns {
@@ -37,6 +40,7 @@ class RayCounter:
             'ray': True, 
             'origins': ray origins (after transform)       [B x 3]
             'dirs': ray direction vector (after transform) [B x 3]
+            'datascale': data scale                        [B]
             'tmax': ray max sample point distance (after transform) [B]
             'raysum': ray grid visit sum   [B]
             'raycnt': ray grid visit count [B]
@@ -47,7 +51,7 @@ class RayCounter:
         }
         '''
         
-        saveDict = self.count(rays=rays, addToTotal=addToTotal, countGrid=countGrid, rayLoss=rayLoss, iters=iters, eps=eps, spreadMeanRayLoss=spreadMeanRayLoss)
+        saveDict = self.count(rays=rays, addToTotal=addToTotal, countGrid=countGrid, rayLoss=rayLoss, iters=iters, eps=eps, spreadMode=spreadMode)
         
         if extraInfo is None:
             extraInfo = dict()
@@ -56,7 +60,7 @@ class RayCounter:
 
         return self.saveNpy(path=path, saveDict=saveDict)
 
-    def count(self, rays: Rays, addToTotal: bool=True, countGrid: torch.Tensor=None, rayLoss: torch.Tensor=None, iters: int=1, eps=1e-8, spreadMeanRayLoss=True) -> dict:
+    def count(self, rays: Rays, addToTotal: bool=True, countGrid: torch.Tensor=None, rayLoss: torch.Tensor=None, iters: int=1, eps=1e-8, spreadMode='SIGMA') -> dict:
         '''
         @param rays: Rays (Origins + Dirs)
         @param addToTotal: if True, the result is add to self.counts
@@ -64,7 +68,10 @@ class RayCounter:
         @param rayLoss:   spread ray loss evenly to its passing grid (without distance weight) [B]
         @param iters: rayLoss spread iters (just leave it as default)
         @param eps: a very small number to prevent divide by 0
-        @param spreadMeanRayLoss: if True, spread (ray loss / passed grid cnt) to grid, else spread (ray loss) directly
+        @param spreadMode: [ SUM | MEAN | SIGMA ] 
+            SUM:  spread (ray loss) directly
+            MEAN: spread (ray loss / passed grid cnt) to grid
+            SIGMA: spread ray loss the same way as rendering (weight is cumulated sigma)
 
         @returns {
             'cnt': current ray grid visit [H x W x D]
@@ -72,6 +79,7 @@ class RayCounter:
             'ray': True, 
             'origins': ray origins (after transform)       [B x 3]
             'dirs': ray direction vector (after transform) [B x 3]
+            'datascale': data scale                        [B]
             'tmax': ray max sample point distance (after transform) [B]
             'raysum': ray grid visit sum   [B]
             'raycnt': ray grid visit count [B]
@@ -90,7 +98,7 @@ class RayCounter:
         rayLossCnt = torch.zeros_like(self.grid.links)
 
         for iter in range(iters):
-            deltaRayLossCnt = self.countRayLoss(countResult=countResult, rayLoss=rayLoss, rayLossCnt=rayLossCnt, eps=eps, spreadMeanRayLoss=spreadMeanRayLoss)
+            deltaRayLossCnt = self.countRayLoss(countResult=countResult, rayLoss=rayLoss, rayLossCnt=rayLossCnt, eps=eps, spreadMode=spreadMode)
             rayLossCnt = rayLossCnt + deltaRayLossCnt
         
         countResult['rayloss'] = rayLossCnt / iters
@@ -201,16 +209,21 @@ class RayCounter:
             'ray': True, 
             'origins': originResult.detach(), 
             'dirs': dirResult.detach(), 
+            'datascale': delta_scale.detach(), 
             'tmax': tMaxResult.detach(), 
             'raysum': summResult.detach(), 
             'raycnt': currentVisCnt.detach(), 
             'raymean': (summResult / (currentVisCnt + eps)).detach()
         }
 
-    def countRayLoss(self, countResult, rayLoss: torch.Tensor, rayLossCnt: torch.Tensor, eps, spreadMeanRayLoss: bool):
+    def countRayLoss(self, countResult, rayLoss: torch.Tensor, rayLossCnt: torch.Tensor, eps, spreadMode: str):
+        '''
+        @param spreadMode: [ SUM | MEAN | SIGMA ]
+        '''
         origins = countResult['origins']
         dirs = countResult['dirs']
         rayCounts = countResult['raycnt']
+        delta_scale = countResult['datascale']
         invdirs = 1.0 / dirs
         B = dirs.size(0)
 
@@ -229,6 +242,7 @@ class RayCounter:
         tmax[dirs == 0] = 1e9
         tmax = torch.min(tmax, dim=-1).values
 
+        log_light_intensity = torch.zeros(B, device=origins.device)
         good_indices = torch.arange(B, device=origins.device)
 
         mask = t <= tmax
@@ -279,13 +293,54 @@ class RayCounter:
             c11 = sigma110 * wa[:, 2] + sigma111 * wb[:, 2]
             c0 = c00 * wa[:, 1] + c01 * wb[:, 1]
             c1 = c10 * wa[:, 1] + c11 * wb[:, 1]
-            sigma = c0 * wa[:, 0] + c1 * wb[:, 0]
+            cnt_sigma = c0 * wa[:, 0] + c1 * wb[:, 0]
 
-            if spreadMeanRayLoss:
-                sigma = sigma * rayLoss.detach() / (rayCounts + eps)
+            if spreadMode == 'MEAN':
+                cnt_sigma = cnt_sigma * rayLoss.detach() / (rayCounts + eps)
+            elif spreadMode == 'SUM':
+                cnt_sigma = cnt_sigma * rayLoss.detach()
+            elif spreadMode == 'SIGMA':
+                links000 = self.grid.links[lx, ly, lz]
+                links001 = self.grid.links[lx, ly, lz + 1]
+                links010 = self.grid.links[lx, ly + 1, lz]
+                links011 = self.grid.links[lx, ly + 1, lz + 1]
+                links100 = self.grid.links[lx + 1, ly, lz]
+                links101 = self.grid.links[lx + 1, ly, lz + 1]
+                links110 = self.grid.links[lx + 1, ly + 1, lz]
+                links111 = self.grid.links[lx + 1, ly + 1, lz + 1]
+
+                sigma000, rgb000 = self.grid._fetch_links(links000)
+                sigma001, rgb001 = self.grid._fetch_links(links001)
+                sigma010, rgb010 = self.grid._fetch_links(links010)
+                sigma011, rgb011 = self.grid._fetch_links(links011)
+                sigma100, rgb100 = self.grid._fetch_links(links100)
+                sigma101, rgb101 = self.grid._fetch_links(links101)
+                sigma110, rgb110 = self.grid._fetch_links(links110)
+                sigma111, rgb111 = self.grid._fetch_links(links111)
+
+                c00 = sigma000 * wa[:, 2:] + sigma001 * wb[:, 2:]
+                c01 = sigma010 * wa[:, 2:] + sigma011 * wb[:, 2:]
+                c10 = sigma100 * wa[:, 2:] + sigma101 * wb[:, 2:]
+                c11 = sigma110 * wa[:, 2:] + sigma111 * wb[:, 2:]
+                c0 = c00 * wa[:, 1:2] + c01 * wb[:, 1:2]
+                c1 = c10 * wa[:, 1:2] + c11 * wb[:, 1:2]
+                realSigma = c0 * wa[:, :1] + c1 * wb[:, :1] # Ray x 1
+
+                log_att = ( # Ray
+                    -self.grid.opt.step_size
+                    * torch.relu(realSigma[..., 0])
+                    * delta_scale[good_indices]
+                )
+
+                weight = torch.exp(log_light_intensity[good_indices]) * (
+                    1.0 - torch.exp(log_att)
+                ) # Ray
+
+                cnt_sigma = cnt_sigma * weight * rayLoss.detach()
+                log_light_intensity[good_indices] += log_att
             else:
-                sigma = sigma * rayLoss.detach()
-            rayLossSumm = rayLossSumm + sigma.sum()
+                assert False, 'unknown spreadMode'
+            rayLossSumm = rayLossSumm + cnt_sigma.sum()
 
             t += self.grid.opt.step_size
 
@@ -308,6 +363,15 @@ class RayCounter:
 
         np.save(path, saveDict)
         return saveDict
+
+    def getSigma(self) -> torch.Tensor:
+        '''
+        @returns Tensor W x H x D
+        '''
+        A, B, C = self.grid.links.shape
+        idxs = self.grid.links.reshape(-1)
+        sigma, _ = self.grid._fetch_links(idxs)
+        return sigma.reshape(A, B, C)
 
 class RayVisualizer:
     def visualization(self, path, showTotal: bool=True, showRay: bool=False, eps=1e-10):

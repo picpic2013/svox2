@@ -17,6 +17,22 @@ def define_common_args(parser : argparse.ArgumentParser):
                          choices=list(datasets.keys()) + ["auto"],
                          default="auto",
                          help="Dataset type (specify type or use auto)")
+    group.add_argument('--ucb_sample', 
+                         type=bool, 
+                         default=False, 
+                         help="use UCB to train rays")
+    group.add_argument('--ucb_factor', 
+                         type=float, 
+                         default=1e-7, 
+                         help="UCB Confidential Bounder factor")
+    group.add_argument('--output_all_after_iter', 
+                         type=int, 
+                         default=None, 
+                         help="output full test dataset after some iters")
+    group.add_argument('--start_topk_over_psnr', 
+                         type=float, 
+                         default=None, 
+                         help="after psnr is larger than the arg, start topk operation")
     group.add_argument('--scene_scale',
                          type=float,
                          default=None,
@@ -126,7 +142,8 @@ def build_data_options(args):
         'data_bbox_scale': args.data_bbox_scale,
         'cam_scale_factor': args.cam_scale_factor,
         'normalize_by_camera': args.normalize_by_camera,
-        'permutation': args.perm
+        'permutation': args.perm, 
+        'ucb_sample': args.ucb_sample
     }
 
 def maybe_merge_config_file(args, allow_invalid=False):

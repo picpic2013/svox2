@@ -15,3 +15,5 @@ outputs
 pictest
 !pictest/raycnt/RayCounterUtils.py
 !pictest/raycnt/__init__.py
+
+dist

@@ -1,5 +1,5 @@
 {
-    "reso": "[[256, 256, 256]]",
+    "reso": "[[128, 128, 128]]", 
     "upsamp_every": 38400,
     "renderer_backend": "nvol",
     "lr_sigma": 3e-1,
