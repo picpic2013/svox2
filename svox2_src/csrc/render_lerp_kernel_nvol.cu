@@ -12,17 +12,9 @@
 #include <cstdint>
 #include <tuple>
 
-namespace {
-const int WARP_SIZE = 32;
+#include "config.cuh"
 
-const int TRACE_RAY_CUDA_THREADS = 128;
-const int TRACE_RAY_CUDA_RAYS_PER_BLOCK = TRACE_RAY_CUDA_THREADS / WARP_SIZE;
-
-const int TRACE_RAY_BKWD_CUDA_THREADS = 128;
-const int TRACE_RAY_BKWD_CUDA_RAYS_PER_BLOCK = TRACE_RAY_BKWD_CUDA_THREADS / WARP_SIZE;
-
-const int MIN_BLOCKS_PER_SM = 8;
-typedef cub::WarpReduce<float> WarpReducef;
+namespace svox2 {
 
 namespace device {
 
@@ -417,9 +409,9 @@ torch::Tensor volume_render_nvol(SparseGridSpec& grid, RaysSpec& rays, RenderOpt
     const auto Q = rays.origins.size(0);
 
     torch::Tensor results = torch::empty_like(rays.origins);
-    const int cuda_n_threads = TRACE_RAY_CUDA_THREADS;
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, cuda_n_threads);
-    device::render_ray_kernel<<<blocks, cuda_n_threads>>>(
+    const int cuda_n_threads = svox2::TRACE_RAY_CUDA_THREADS;
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, cuda_n_threads);
+    svox2::device::render_ray_kernel<<<blocks, cuda_n_threads>>>(
             grid, rays, opt,
             // Output
             results.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
@@ -442,9 +434,9 @@ void volume_render_nvol_backward(
     grads.check();
     const auto Q = rays.origins.size(0);
 
-    const int cuda_n_threads_render_backward = TRACE_RAY_BKWD_CUDA_THREADS;
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, cuda_n_threads_render_backward);
-    device::render_ray_backward_kernel<<<blocks,
+    const int cuda_n_threads_render_backward = svox2::TRACE_RAY_BKWD_CUDA_THREADS;
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, cuda_n_threads_render_backward);
+    svox2::device::render_ray_backward_kernel<<<blocks,
         cuda_n_threads_render_backward>>>(
                 grid,
                 grad_out.data_ptr<float>(),
@@ -477,16 +469,16 @@ void volume_render_nvol_fused(
     const auto Q = rays.origins.size(0);
 
     {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, TRACE_RAY_CUDA_THREADS);
-        device::render_ray_kernel<<<blocks, TRACE_RAY_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, svox2::TRACE_RAY_CUDA_THREADS);
+        svox2::device::render_ray_kernel<<<blocks, svox2::TRACE_RAY_CUDA_THREADS>>>(
                 grid, rays, opt,
                 // Output
                 rgb_out.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
     }
 
     {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, TRACE_RAY_BKWD_CUDA_THREADS);
-        device::render_ray_backward_kernel<<<blocks, TRACE_RAY_BKWD_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, svox2::TRACE_RAY_BKWD_CUDA_THREADS);
+        svox2::device::render_ray_backward_kernel<<<blocks, svox2::TRACE_RAY_BKWD_CUDA_THREADS>>>(
                 grid,
                 rgb_gt.data_ptr<float>(),
                 rgb_out.data_ptr<float>(),

@@ -4,7 +4,7 @@
 #include "cuda_util.cuh"
 #include "data_spec_packed.cuh"
 
-namespace {
+namespace svox2 {
 namespace device {
 
 __global__ void sample_grid_sh_kernel(
@@ -197,13 +197,13 @@ std::tuple<torch::Tensor, torch::Tensor> sample_grid(SparseGridSpec& grid, torch
     cudaStreamCreate(&stream_1);
     cudaStreamCreate(&stream_2);
 
-    device::sample_grid_density_kernel<<<blocks_density, cuda_n_threads, 0, stream_1>>>(
+    svox2::device::sample_grid_density_kernel<<<blocks_density, cuda_n_threads, 0, stream_1>>>(
             grid,
             points.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
             // Output
             result_density.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
     if (want_colors) {
-        device::sample_grid_sh_kernel<<<blocks, cuda_n_threads, 0, stream_2>>>(
+        svox2::device::sample_grid_sh_kernel<<<blocks, cuda_n_threads, 0, stream_2>>>(
                 grid,
                 points.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
                 // Output
@@ -244,7 +244,7 @@ void sample_grid_backward(
     cudaStreamCreate(&stream_1);
     cudaStreamCreate(&stream_2);
 
-    device::sample_grid_density_backward_kernel<<<blocks_density, cuda_n_threads, 0, stream_1>>>(
+    svox2::device::sample_grid_density_backward_kernel<<<blocks_density, cuda_n_threads, 0, stream_1>>>(
             grid,
             points.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
             grad_out_density.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
@@ -252,7 +252,7 @@ void sample_grid_backward(
             grad_density_out.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
 
     if (want_colors) {
-        device::sample_grid_sh_backward_kernel<<<blocks, cuda_n_threads, 0, stream_2>>>(
+        svox2::device::sample_grid_sh_backward_kernel<<<blocks, cuda_n_threads, 0, stream_2>>>(
                 grid,
                 points.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
                 grad_out_sh.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),

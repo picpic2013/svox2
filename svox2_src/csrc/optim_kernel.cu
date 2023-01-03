@@ -4,7 +4,7 @@
 #include <torch/extension.h>
 #include "cuda_util.cuh"
 
-namespace {
+namespace svox2 {
 
 const int RMSPROP_STEP_CUDA_THREADS = 256;
 const int MIN_BLOCKS_PER_SM = 4;
@@ -170,12 +170,12 @@ void rmsprop_step(
 
     if (lr_last < 0.f) lr_last = lr;
 
-    const int cuda_n_threads = RMSPROP_STEP_CUDA_THREADS;
+    const int cuda_n_threads = svox2::RMSPROP_STEP_CUDA_THREADS;
 
     if (indexer.dim() == 0) {
         const size_t Q = data.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::rmsprop_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::rmsprop_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 rms.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
@@ -189,7 +189,7 @@ void rmsprop_step(
     } else if (indexer.scalar_type() == at::ScalarType::Bool) {
         const size_t Q = data.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::rmsprop_mask_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::rmsprop_mask_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 rms.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
@@ -202,7 +202,7 @@ void rmsprop_step(
     } else {
         const size_t Q = indexer.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::rmsprop_index_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::rmsprop_index_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 rms.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
@@ -231,12 +231,12 @@ void sgd_step(
 
     if (lr_last < 0.f) lr_last = lr;
 
-    const int cuda_n_threads = RMSPROP_STEP_CUDA_THREADS;
+    const int cuda_n_threads = svox2::RMSPROP_STEP_CUDA_THREADS;
 
     if (indexer.dim() == 0) {
         const size_t Q = data.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::sgd_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::sgd_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 lr,
@@ -246,7 +246,7 @@ void sgd_step(
     } else if (indexer.scalar_type() == at::ScalarType::Bool) {
         const size_t Q = data.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::sgd_mask_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::sgd_mask_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 indexer.data_ptr<bool>(),
@@ -255,7 +255,7 @@ void sgd_step(
     } else {
         const size_t Q = indexer.size(0) * data.size(1);
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::sgd_index_step_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::sgd_index_step_kernel<<<blocks, cuda_n_threads>>>(
                 data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 grad.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 indexer.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),

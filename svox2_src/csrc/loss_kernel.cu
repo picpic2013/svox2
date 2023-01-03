@@ -8,7 +8,7 @@
 #include "render_util.cuh"
 #include "data_spec_packed.cuh"
 
-namespace {
+namespace svox2 {
 
 const int WARP_SIZE = 32;
 const int TV_GRAD_CUDA_THREADS = 256;
@@ -498,9 +498,9 @@ torch::Tensor tv(torch::Tensor links, torch::Tensor data,
     int nl = (links.size(0) - 1) * (links.size(1) - 1) * (links.size(2) - 1);
     size_t Q = nl * size_t(end_dim - start_dim);
 
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TV_GRAD_CUDA_THREADS);
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TV_GRAD_CUDA_THREADS);
     torch::Tensor result = torch::zeros({}, data.options());
-    device::tv_kernel<<<blocks, TV_GRAD_CUDA_THREADS>>>(
+    svox2::device::tv_kernel<<<blocks, svox2::TV_GRAD_CUDA_THREADS>>>(
             links.packed_accessor32<int32_t, 3, torch::RestrictPtrTraits>(),
             data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
             start_dim,
@@ -539,9 +539,9 @@ void tv_grad(torch::Tensor links,
     int nl = (links.size(0) - 1) * (links.size(1) - 1) * (links.size(2) - 1);
     size_t Q = nl * size_t(end_dim - start_dim);
 
-    const int cuda_n_threads = TV_GRAD_CUDA_THREADS;
+    const int cuda_n_threads = svox2::TV_GRAD_CUDA_THREADS;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-    device::tv_grad_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::tv_grad_kernel<<<blocks, cuda_n_threads>>>(
             links.packed_accessor32<int32_t, 3, torch::RestrictPtrTraits>(),
             data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
             start_dim,
@@ -584,9 +584,9 @@ void tv_grad_sparse(torch::Tensor links,
     int nl = rand_cells.size(0);
     size_t Q = rand_cells.size(0) * size_t(end_dim - start_dim);
 
-    const int cuda_n_threads = TV_GRAD_CUDA_THREADS;
+    const int cuda_n_threads = svox2::TV_GRAD_CUDA_THREADS;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-    device::tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
             links.packed_accessor32<int32_t, 3, torch::RestrictPtrTraits>(),
             data.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
             rand_cells.data_ptr<int32_t>(),
@@ -625,9 +625,9 @@ void msi_tv_grad_sparse(
     int nl = rand_cells.size(0);
     size_t Q = rand_cells.size(0) * msi.size(2);
 
-    const int cuda_n_threads = TV_GRAD_CUDA_THREADS;
+    const int cuda_n_threads = svox2::TV_GRAD_CUDA_THREADS;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-    device::msi_tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::msi_tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
             links.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>(),
             msi.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
             rand_cells.data_ptr<int32_t>(),
@@ -659,11 +659,11 @@ void lumisphere_tv_grad_sparse(
     grads.check();
 
     int nl = rand_cells.size(0);
-    size_t Q = rand_cells.size(0) * WARP_SIZE;
+    size_t Q = rand_cells.size(0) * svox2::WARP_SIZE;
 
-    const int cuda_n_threads = TV_GRAD_CUDA_THREADS;
+    const int cuda_n_threads = svox2::TV_GRAD_CUDA_THREADS;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-    device::lumisphere_tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::lumisphere_tv_grad_sparse_kernel<<<blocks, cuda_n_threads>>>(
             grid,
             rand_cells.data_ptr<int32_t>(),
             basis_fn.data_ptr<float>(),

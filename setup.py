@@ -34,18 +34,33 @@ else:
 	include_dirs.append(os.path.realpath(cub_home).replace("\\ ", " "))
 
 try:
+
+    def isFileCuOrCpp(fileName, postfixs):
+        for post in postfixs:
+            if fileName[-len(post) - 1:] == '.' + post:
+                return True
+        return False
+
+    def addFileToCsrcList(basePath, srcList, postfixs=None):
+        if postfixs is None:
+            postfixs = ['cu', 'cpp']
+        commonFileList = os.listdir(os.path.join(basePath))
+        commonFileList = [os.path.join(basePath, _) for _ in commonFileList if isFileCuOrCpp(_, postfixs)]
+        srcList.extend(commonFileList)
+
+    basePath = os.path.join('svox2_src', 'csrc')
+    csrcList = []
+
+    addFileToCsrcList(basePath, csrcList)
+    addFileToCsrcList(os.path.join(basePath, 'pic_cuvol'), csrcList)
+
     ext_modules = [
-        CUDAExtension('svox2.csrc', [
-            'svox2_src/csrc/svox2.cpp',
-            'svox2_src/csrc/svox2_kernel.cu',
-            'svox2_src/csrc/render_lerp_kernel_cuvol.cu',
-            'svox2_src/csrc/render_lerp_kernel_nvol.cu',
-            'svox2_src/csrc/render_svox1_kernel.cu',
-            'svox2_src/csrc/misc_kernel.cu',
-            'svox2_src/csrc/loss_kernel.cu',
-            'svox2_src/csrc/optim_kernel.cu',
-        ], include_dirs=include_dirs,
-        optional=False),
+        CUDAExtension(
+            'svox2.csrc', 
+            csrcList, 
+            include_dirs=include_dirs,
+            optional=False
+        ),
     ]
 except:
     import warnings

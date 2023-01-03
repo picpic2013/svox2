@@ -5,7 +5,7 @@
 #include "cuda_util.cuh"
 #include "random_util.cuh"
 
-namespace {
+namespace svox2 {
 namespace device {
 
 struct PackedSparseGridSpec {

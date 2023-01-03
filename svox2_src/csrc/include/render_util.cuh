@@ -5,7 +5,7 @@
 #include "data_spec_packed.cuh"
 #include "random_util.cuh"
 
-namespace {
+namespace svox2 {
 namespace device {
 
 template<class data_type_t, class voxel_index_t>

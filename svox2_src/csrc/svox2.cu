@@ -1,75 +1,8 @@
 // Copyright 2021 Alex Yu
 
 // This file contains only Python bindings
-#include "data_spec.hpp"
-#include <cstdint>
-#include <torch/extension.h>
-#include <tuple>
-
-using torch::Tensor;
-
-std::tuple<torch::Tensor, torch::Tensor> sample_grid(SparseGridSpec &, Tensor,
-                                                     bool);
-void sample_grid_backward(SparseGridSpec &, Tensor, Tensor, Tensor, Tensor,
-                          Tensor, bool);
-
-// ** NeRF rendering formula (trilerp)
-Tensor volume_render_cuvol(SparseGridSpec &, RaysSpec &, RenderOptions &);
-Tensor volume_render_cuvol_image(SparseGridSpec &, CameraSpec &,
-                                 RenderOptions &);
-void volume_render_cuvol_backward(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                                  Tensor, Tensor, GridOutputGrads &);
-void volume_render_cuvol_fused(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                               Tensor, float, float, Tensor, GridOutputGrads &);
-// Expected termination (depth) rendering
-torch::Tensor volume_render_expected_term(SparseGridSpec &, RaysSpec &,
-                                          RenderOptions &);
-// Depth rendering based on sigma-threshold as in Dex-NeRF
-torch::Tensor volume_render_sigma_thresh(SparseGridSpec &, RaysSpec &,
-                                         RenderOptions &, float);
-
-// ** NV rendering formula (trilerp)
-Tensor volume_render_nvol(SparseGridSpec &, RaysSpec &, RenderOptions &);
-void volume_render_nvol_backward(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                                 Tensor, Tensor, GridOutputGrads &);
-void volume_render_nvol_fused(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                              Tensor, float, float, Tensor, GridOutputGrads &);
-
-// ** NeRF rendering formula (nearest-neighbor, infinitely many steps)
-Tensor volume_render_svox1(SparseGridSpec &, RaysSpec &, RenderOptions &);
-void volume_render_svox1_backward(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                                  Tensor, Tensor, GridOutputGrads &);
-void volume_render_svox1_fused(SparseGridSpec &, RaysSpec &, RenderOptions &,
-                               Tensor, float, float, Tensor, GridOutputGrads &);
-
-// Tensor volume_render_cuvol_image(SparseGridSpec &, CameraSpec &,
-//                                  RenderOptions &);
-//
-// void volume_render_cuvol_image_backward(SparseGridSpec &, CameraSpec &,
-//                                         RenderOptions &, Tensor, Tensor,
-//                                         GridOutputGrads &);
-
-// Misc
-Tensor dilate(Tensor);
-void accel_dist_prop(Tensor);
-void grid_weight_render(Tensor, CameraSpec &, float, float, bool, Tensor,
-                        Tensor, Tensor);
-// void sample_cubemap(Tensor, Tensor, bool, Tensor);
-
-// Loss
-Tensor tv(Tensor, Tensor, int, int, bool, float, bool, float, float);
-void tv_grad(Tensor, Tensor, int, int, float, bool, float, bool, float, float,
-             Tensor);
-void tv_grad_sparse(Tensor, Tensor, Tensor, Tensor, int, int, float, bool,
-                    float, bool, bool, float, float, Tensor);
-void msi_tv_grad_sparse(Tensor, Tensor, Tensor, Tensor, float, float, Tensor);
-void lumisphere_tv_grad_sparse(SparseGridSpec &, Tensor, Tensor, Tensor, float,
-                               float, float, float, GridOutputGrads &);
-
-// Optim
-void rmsprop_step(Tensor, Tensor, Tensor, Tensor, float, float, float, float,
-                  float);
-void sgd_step(Tensor, Tensor, Tensor, float, float);
+#include "pic_cuvol_render.cuh"
+#include "svox2.cuh"
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 #define _REG_FUNC(funname) m.def(#funname, &funname)
@@ -81,6 +14,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   _REG_FUNC(volume_render_cuvol_fused);
   _REG_FUNC(volume_render_expected_term);
   _REG_FUNC(volume_render_sigma_thresh);
+
+//   _REG_FUNC(volume_render_pic_cuvol);
+//   _REG_FUNC(volume_render_pic_cuvol_image);
+//   _REG_FUNC(volume_render_pic_cuvol_backward);
+  _REG_FUNC(volume_render_pic_cuvol_fused);
 
   _REG_FUNC(volume_render_nvol);
   _REG_FUNC(volume_render_nvol_backward);

@@ -8,21 +8,9 @@
 #include <cstdint>
 #include <tuple>
 
-namespace {
-const int WARP_SIZE = 32;
+#include "config.cuh"
 
-const int TRACE_RAY_CUDA_THREADS = 128;
-const int TRACE_RAY_CUDA_RAYS_PER_BLOCK = TRACE_RAY_CUDA_THREADS / WARP_SIZE;
-
-const int TRACE_RAY_BKWD_CUDA_THREADS = 128;
-const int TRACE_RAY_BKWD_CUDA_RAYS_PER_BLOCK = TRACE_RAY_BKWD_CUDA_THREADS / WARP_SIZE;
-
-const int MIN_BLOCKS_PER_SM = 8;
-
-const int TRACE_RAY_BG_CUDA_THREADS = 128;
-const int MIN_BG_BLOCKS_PER_SM = 8;
-typedef cub::WarpReduce<float> WarpReducef;
-
+namespace svox2 {
 namespace device {
 
 
@@ -902,6 +890,9 @@ __global__ void render_ray_sigma_thresh_kernel(
 
 }  // namespace device
 
+}  // namespace
+
+namespace {
 torch::Tensor _get_empty_1d(const torch::Tensor& origins) {
     auto options =
         torch::TensorOptions()
@@ -911,8 +902,7 @@ torch::Tensor _get_empty_1d(const torch::Tensor& origins) {
         .requires_grad(false);
     return torch::empty({origins.size(0)}, options);
 }
-
-}  // namespace
+}
 
 torch::Tensor volume_render_cuvol(SparseGridSpec& grid, RaysSpec& rays, RenderOptions& opt) {
     DEVICE_GUARD(grid.sh_data);
@@ -932,9 +922,9 @@ torch::Tensor volume_render_cuvol(SparseGridSpec& grid, RaysSpec& rays, RenderOp
     }
 
     {
-        const int cuda_n_threads = TRACE_RAY_CUDA_THREADS;
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, cuda_n_threads);
-        device::render_ray_kernel<<<blocks, cuda_n_threads>>>(
+        const int cuda_n_threads = svox2::TRACE_RAY_CUDA_THREADS;
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, cuda_n_threads);
+        svox2::device::render_ray_kernel<<<blocks, cuda_n_threads>>>(
                 grid, rays, opt,
                 // Output
                 results.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
@@ -943,8 +933,8 @@ torch::Tensor volume_render_cuvol(SparseGridSpec& grid, RaysSpec& rays, RenderOp
 
     if (use_background) {
         // printf("RENDER BG\n");
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_BG_CUDA_THREADS);
-        device::render_background_kernel<<<blocks, TRACE_RAY_BG_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_BG_CUDA_THREADS);
+        svox2::device::render_background_kernel<<<blocks, svox2::TRACE_RAY_BG_CUDA_THREADS>>>(
                 grid,
                 rays,
                 opt,
@@ -980,9 +970,9 @@ torch::Tensor volume_render_cuvol_image(SparseGridSpec& grid, CameraSpec& cam, R
     }
 
     {
-        const int cuda_n_threads = TRACE_RAY_CUDA_THREADS;
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, cuda_n_threads);
-        device::render_ray_image_kernel<<<blocks, cuda_n_threads>>>(
+        const int cuda_n_threads = svox2::TRACE_RAY_CUDA_THREADS;
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, cuda_n_threads);
+        svox2::device::render_ray_image_kernel<<<blocks, cuda_n_threads>>>(
                 grid,
                 cam,
                 opt,
@@ -993,8 +983,8 @@ torch::Tensor volume_render_cuvol_image(SparseGridSpec& grid, CameraSpec& cam, R
 
     if (use_background) {
         // printf("RENDER BG\n");
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_BG_CUDA_THREADS);
-        device::render_background_image_kernel<<<blocks, TRACE_RAY_BG_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_BG_CUDA_THREADS);
+        svox2::device::render_background_image_kernel<<<blocks, svox2::TRACE_RAY_BG_CUDA_THREADS>>>(
                 grid,
                 cam,
                 opt,
@@ -1029,9 +1019,9 @@ void volume_render_cuvol_backward(
     }
 
     {
-        const int cuda_n_threads_render_backward = TRACE_RAY_BKWD_CUDA_THREADS;
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, cuda_n_threads_render_backward);
-        device::render_ray_backward_kernel<<<blocks,
+        const int cuda_n_threads_render_backward = svox2::TRACE_RAY_BKWD_CUDA_THREADS;
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, cuda_n_threads_render_backward);
+        svox2::device::render_ray_backward_kernel<<<blocks,
             cuda_n_threads_render_backward>>>(
                     grid,
                     grad_out.data_ptr<float>(),
@@ -1048,8 +1038,8 @@ void volume_render_cuvol_backward(
     }
 
     if (use_background) {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_BG_CUDA_THREADS);
-        device::render_background_backward_kernel<<<blocks, TRACE_RAY_BG_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_BG_CUDA_THREADS);
+        svox2::device::render_background_backward_kernel<<<blocks, svox2::TRACE_RAY_BG_CUDA_THREADS>>>(
                 grid,
                 grad_out.data_ptr<float>(),
                 color_cache.data_ptr<float>(),
@@ -1096,8 +1086,8 @@ void volume_render_cuvol_fused(
     }
 
     {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, TRACE_RAY_CUDA_THREADS);
-        device::render_ray_kernel<<<blocks, TRACE_RAY_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, svox2::TRACE_RAY_CUDA_THREADS);
+        svox2::device::render_ray_kernel<<<blocks, svox2::TRACE_RAY_CUDA_THREADS>>>(
                 grid, rays, opt,
                 // Output
                 rgb_out.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
@@ -1105,8 +1095,8 @@ void volume_render_cuvol_fused(
     }
 
     if (use_background) {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_BG_CUDA_THREADS);
-        device::render_background_kernel<<<blocks, TRACE_RAY_BG_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_BG_CUDA_THREADS);
+        svox2::device::render_background_kernel<<<blocks, svox2::TRACE_RAY_BG_CUDA_THREADS>>>(
                 grid,
                 rays,
                 opt,
@@ -1115,8 +1105,8 @@ void volume_render_cuvol_fused(
     }
 
     {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * WARP_SIZE, TRACE_RAY_BKWD_CUDA_THREADS);
-        device::render_ray_backward_kernel<<<blocks, TRACE_RAY_BKWD_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q * svox2::WARP_SIZE, svox2::TRACE_RAY_BKWD_CUDA_THREADS);
+        svox2::device::render_ray_backward_kernel<<<blocks, svox2::TRACE_RAY_BKWD_CUDA_THREADS>>>(
                 grid,
                 rgb_gt.data_ptr<float>(),
                 rgb_out.data_ptr<float>(),
@@ -1132,8 +1122,8 @@ void volume_render_cuvol_fused(
     }
 
     if (use_background) {
-        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_BG_CUDA_THREADS);
-        device::render_background_backward_kernel<<<blocks, TRACE_RAY_BG_CUDA_THREADS>>>(
+        const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_BG_CUDA_THREADS);
+        svox2::device::render_background_backward_kernel<<<blocks, svox2::TRACE_RAY_BG_CUDA_THREADS>>>(
                 grid,
                 rgb_gt.data_ptr<float>(),
                 rgb_out.data_ptr<float>(),
@@ -1160,8 +1150,8 @@ torch::Tensor volume_render_expected_term(SparseGridSpec& grid,
         .requires_grad(false);
     torch::Tensor results = torch::empty({rays.origins.size(0)}, options);
     const auto Q = rays.origins.size(0);
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_CUDA_THREADS);
-    device::render_ray_expected_term_kernel<<<blocks, TRACE_RAY_CUDA_THREADS>>>(
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_CUDA_THREADS);
+    svox2::device::render_ray_expected_term_kernel<<<blocks, svox2::TRACE_RAY_CUDA_THREADS>>>(
             grid,
             rays,
             opt,
@@ -1182,8 +1172,8 @@ torch::Tensor volume_render_sigma_thresh(SparseGridSpec& grid,
         .requires_grad(false);
     torch::Tensor results = torch::empty({rays.origins.size(0)}, options);
     const auto Q = rays.origins.size(0);
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, TRACE_RAY_CUDA_THREADS);
-    device::render_ray_sigma_thresh_kernel<<<blocks, TRACE_RAY_CUDA_THREADS>>>(
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::TRACE_RAY_CUDA_THREADS);
+    svox2::device::render_ray_sigma_thresh_kernel<<<blocks, svox2::TRACE_RAY_CUDA_THREADS>>>(
             grid,
             rays,
             opt,

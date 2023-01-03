@@ -7,7 +7,7 @@
 #define _ORI(x) (x&1)
 #define _FACE(axis, ori) uint8_t((axis << 1) | ori)
 
-namespace {
+namespace svox2 {
 namespace device {
 
 struct CubemapCoord {

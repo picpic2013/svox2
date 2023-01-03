@@ -10,7 +10,7 @@
 #include "data_spec_packed.cuh"
 #include "cubemap_util.cuh"
 
-namespace {
+namespace svox2 {
 
 const int MISC_CUDA_THREADS = 256;
 const int MISC_MIN_BLOCKS_PER_SM = 4;
@@ -344,9 +344,9 @@ torch::Tensor dilate(torch::Tensor grid) {
 
     int Q = grid.size(0) * grid.size(1) * grid.size(2);
 
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, MISC_CUDA_THREADS);
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::MISC_CUDA_THREADS);
     torch::Tensor result = torch::empty_like(grid);
-    device::dilate_kernel<<<blocks, MISC_CUDA_THREADS>>>(
+    svox2::device::dilate_kernel<<<blocks, svox2::MISC_CUDA_THREADS>>>(
             grid.packed_accessor32<bool, 3, torch::RestrictPtrTraits>(),
             // Output
             result.packed_accessor32<bool, 3, torch::RestrictPtrTraits>());
@@ -366,7 +366,7 @@ void accel_dist_prop(torch::Tensor grid) {
 
     int Q = grid.size(0) * grid.size(1) * grid.size(2);
 
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, MISC_CUDA_THREADS);
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::MISC_CUDA_THREADS);
 
     int64_t req_size = 0;
     while (sz_x > 1 && sz_y > 1 && sz_z > 1) {
@@ -382,11 +382,11 @@ void accel_dist_prop(torch::Tensor grid) {
                   .device(grid.device())
                   .requires_grad(false);
     torch::Tensor tmp = torch::zeros({req_size}, tmp_options);
-    device::accel_dist_set_kernel<<<blocks, MISC_CUDA_THREADS>>>(
+    svox2::device::accel_dist_set_kernel<<<blocks, svox2::MISC_CUDA_THREADS>>>(
             grid.packed_accessor32<int32_t, 3, torch::RestrictPtrTraits>(),
             tmp.data_ptr<bool>());
 
-    device::accel_dist_prop_kernel<<<blocks, MISC_CUDA_THREADS>>>(
+    svox2::device::accel_dist_prop_kernel<<<blocks, svox2::MISC_CUDA_THREADS>>>(
             grid.packed_accessor32<int32_t, 3, torch::RestrictPtrTraits>(),
             tmp.data_ptr<bool>());
 
@@ -430,9 +430,9 @@ void grid_weight_render(
     cam.check();
     const size_t Q = size_t(cam.width) * cam.height;
 
-    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, MISC_CUDA_THREADS);
+    const int blocks = CUDA_N_BLOCKS_NEEDED(Q, svox2::MISC_CUDA_THREADS);
 
-    device::grid_weight_render_kernel<<<blocks, MISC_CUDA_THREADS>>>(
+    svox2::device::grid_weight_render_kernel<<<blocks, svox2::MISC_CUDA_THREADS>>>(
         data.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         cam,
         step_size,

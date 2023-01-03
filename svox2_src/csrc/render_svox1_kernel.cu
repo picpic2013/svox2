@@ -7,7 +7,7 @@
 #include "render_util.cuh"
 #include "data_spec_packed.cuh"
 
-namespace {
+namespace svox2 {
 namespace device {
 // From old version (name is hacky whatever)
 struct BasicSingleRaySpec {
@@ -341,7 +341,7 @@ torch::Tensor volume_render_svox1(SparseGridSpec& grid, RaysSpec& rays, RenderOp
     const int cuda_n_threads = 512;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
     torch::Tensor result = torch::zeros({Q, 3}, rays.origins.options());
-    device::render_ray_svox1_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::render_ray_svox1_kernel<<<blocks, cuda_n_threads>>>(
             grid, rays, opt,
             result.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
     CUDA_CHECK_ERRORS;
@@ -366,7 +366,7 @@ void volume_render_svox1_backward(
 
     const int cuda_n_threads = 512;
     const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-    device::render_ray_svox1_backward_kernel<<<blocks, cuda_n_threads>>>(
+    svox2::device::render_ray_svox1_backward_kernel<<<blocks, cuda_n_threads>>>(
         grid,
         grad_out.data_ptr<float>(),
         color_cache.data_ptr<float>(),
@@ -398,7 +398,7 @@ void volume_render_svox1_fused(
     const int cuda_n_threads = 512;
     {
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::render_ray_svox1_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::render_ray_svox1_kernel<<<blocks, cuda_n_threads>>>(
                 grid, rays, opt,
                 // Output
                 rgb_out.packed_accessor32<float, 2, torch::RestrictPtrTraits>());
@@ -406,7 +406,7 @@ void volume_render_svox1_fused(
     }
     {
         const int blocks = CUDA_N_BLOCKS_NEEDED(Q, cuda_n_threads);
-        device::render_ray_svox1_backward_kernel<<<blocks, cuda_n_threads>>>(
+        svox2::device::render_ray_svox1_backward_kernel<<<blocks, cuda_n_threads>>>(
                 grid,
                 rgb_gt.data_ptr<float>(),
                 rgb_out.data_ptr<float>(),
