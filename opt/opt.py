@@ -495,11 +495,16 @@ while True:
             rgb_gt = dset.rays.gt[batch_begin: batch_end]
             rays = svox2.Rays(batch_origins, batch_dirs)
 
-            #  with Timing("volrend_fused"):
-            rgb_pred = grid.volume_render_fused(rays, rgb_gt,
-                    beta_loss=args.lambda_beta,
-                    sparsity_loss=args.lambda_sparsity,
-                    randomize=args.enable_random)
+            with Timing("volrend_fused"):
+                # rgb_pred = grid.volume_render_fused(rays, rgb_gt,
+                #         beta_loss=args.lambda_beta,
+                #         sparsity_loss=args.lambda_sparsity,
+                #         randomize=args.enable_random)
+
+                rgb_pred, lossGrid, normalizedLossGrid = grid.volume_render_fused_spread_ray_loss(rays, rgb_gt,
+                        beta_loss=args.lambda_beta,
+                        sparsity_loss=args.lambda_sparsity,
+                        randomize=args.enable_random)
 
             #  with Timing("loss_comp"):
             mse = F.mse_loss(rgb_gt, rgb_pred)

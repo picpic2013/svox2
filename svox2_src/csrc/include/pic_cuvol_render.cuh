@@ -38,6 +38,9 @@ __global__ void render_ray_backward_kernel(
     float beta_loss,
     float sparsity_loss,
     svox2::device::PackedGridOutputGrads grads,
+    float* __restrict__ counterOutput,
+    float* __restrict__ grad_color_out,
+    int rayLossSpreadType, 
     float* __restrict__ accum_out = nullptr,
     float* __restrict__ log_transmit_out = nullptr);
 
@@ -63,3 +66,4 @@ Tensor volume_render_pic_cuvol(SparseGridSpec &, RaysSpec &, RenderOptions &);
 Tensor volume_render_pic_cuvol_image(SparseGridSpec &, CameraSpec &, RenderOptions &);
 void volume_render_pic_cuvol_backward(SparseGridSpec &, RaysSpec &, RenderOptions &, Tensor, Tensor, GridOutputGrads &);
 void volume_render_pic_cuvol_fused(SparseGridSpec &, RaysSpec &, RenderOptions &, Tensor, float, float, Tensor, GridOutputGrads &);
+void volume_render_pic_cuvol_fused_with_loss_spread(SparseGridSpec &, RaysSpec &, RenderOptions &, Tensor, float, float, Tensor, GridOutputGrads &, Tensor counterOutput, Tensor grad_color_out, int rayLossSpreadType);

@@ -19,6 +19,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   _REG_FUNC(volume_render_pic_cuvol_image);
   _REG_FUNC(volume_render_pic_cuvol_backward);
   _REG_FUNC(volume_render_pic_cuvol_fused);
+  _REG_FUNC(volume_render_pic_cuvol_fused_with_loss_spread);
 
   _REG_FUNC(volume_render_nvol);
   _REG_FUNC(volume_render_nvol_backward);

@@ -300,43 +300,44 @@ class RayCounter:
             elif spreadMode == 'SUM':
                 cnt_sigma = cnt_sigma * rayLoss.detach()
             elif spreadMode == 'SIGMA':
-                links000 = self.grid.links[lx, ly, lz]
-                links001 = self.grid.links[lx, ly, lz + 1]
-                links010 = self.grid.links[lx, ly + 1, lz]
-                links011 = self.grid.links[lx, ly + 1, lz + 1]
-                links100 = self.grid.links[lx + 1, ly, lz]
-                links101 = self.grid.links[lx + 1, ly, lz + 1]
-                links110 = self.grid.links[lx + 1, ly + 1, lz]
-                links111 = self.grid.links[lx + 1, ly + 1, lz + 1]
+                with torch.no_grad():
+                    links000 = self.grid.links[lx, ly, lz]
+                    links001 = self.grid.links[lx, ly, lz + 1]
+                    links010 = self.grid.links[lx, ly + 1, lz]
+                    links011 = self.grid.links[lx, ly + 1, lz + 1]
+                    links100 = self.grid.links[lx + 1, ly, lz]
+                    links101 = self.grid.links[lx + 1, ly, lz + 1]
+                    links110 = self.grid.links[lx + 1, ly + 1, lz]
+                    links111 = self.grid.links[lx + 1, ly + 1, lz + 1]
 
-                sigma000, rgb000 = self.grid._fetch_links(links000)
-                sigma001, rgb001 = self.grid._fetch_links(links001)
-                sigma010, rgb010 = self.grid._fetch_links(links010)
-                sigma011, rgb011 = self.grid._fetch_links(links011)
-                sigma100, rgb100 = self.grid._fetch_links(links100)
-                sigma101, rgb101 = self.grid._fetch_links(links101)
-                sigma110, rgb110 = self.grid._fetch_links(links110)
-                sigma111, rgb111 = self.grid._fetch_links(links111)
+                    sigma000, rgb000 = self.grid._fetch_links(links000)
+                    sigma001, rgb001 = self.grid._fetch_links(links001)
+                    sigma010, rgb010 = self.grid._fetch_links(links010)
+                    sigma011, rgb011 = self.grid._fetch_links(links011)
+                    sigma100, rgb100 = self.grid._fetch_links(links100)
+                    sigma101, rgb101 = self.grid._fetch_links(links101)
+                    sigma110, rgb110 = self.grid._fetch_links(links110)
+                    sigma111, rgb111 = self.grid._fetch_links(links111)
 
-                c00 = sigma000 * wa[:, 2:] + sigma001 * wb[:, 2:]
-                c01 = sigma010 * wa[:, 2:] + sigma011 * wb[:, 2:]
-                c10 = sigma100 * wa[:, 2:] + sigma101 * wb[:, 2:]
-                c11 = sigma110 * wa[:, 2:] + sigma111 * wb[:, 2:]
-                c0 = c00 * wa[:, 1:2] + c01 * wb[:, 1:2]
-                c1 = c10 * wa[:, 1:2] + c11 * wb[:, 1:2]
-                realSigma = c0 * wa[:, :1] + c1 * wb[:, :1] # Ray x 1
+                    c00 = sigma000 * wa[:, 2:] + sigma001 * wb[:, 2:]
+                    c01 = sigma010 * wa[:, 2:] + sigma011 * wb[:, 2:]
+                    c10 = sigma100 * wa[:, 2:] + sigma101 * wb[:, 2:]
+                    c11 = sigma110 * wa[:, 2:] + sigma111 * wb[:, 2:]
+                    c0 = c00 * wa[:, 1:2] + c01 * wb[:, 1:2]
+                    c1 = c10 * wa[:, 1:2] + c11 * wb[:, 1:2]
+                    realSigma = c0 * wa[:, :1] + c1 * wb[:, :1] # Ray x 1
 
-                log_att = ( # Ray
-                    -self.grid.opt.step_size
-                    * torch.relu(realSigma[..., 0])
-                    * delta_scale[good_indices]
-                )
+                    log_att = ( # Ray
+                        -self.grid.opt.step_size
+                        * torch.relu(realSigma[..., 0])
+                        * delta_scale[good_indices]
+                    )
 
-                weight = torch.exp(log_light_intensity[good_indices]) * (
-                    1.0 - torch.exp(log_att)
-                ) # Ray
+                    weight = torch.exp(log_light_intensity[good_indices]) * (
+                        1.0 - torch.exp(log_att)
+                    ) # Ray
 
-                cnt_sigma = cnt_sigma * weight * rayLoss.detach()
+                cnt_sigma = cnt_sigma * weight.detach() * rayLoss.detach()
                 log_light_intensity[good_indices] += log_att
             else:
                 assert False, 'unknown spreadMode'

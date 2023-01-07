@@ -3,23 +3,53 @@
 
 namespace {
 
+template<class data_type_t, class voxel_index_t>
+__device__ __inline__ void trilerp_backward_counter(
+    data_type_t* __restrict__ counter_data,
+    int offx, int offy, 
+    const voxel_index_t* __restrict__ l,
+    const float* __restrict__ pos,
+    float rayLoss
+) {
+    const float ay = 1.f - pos[1], az = 1.f - pos[2];
+    float xo = (1.0f - pos[0]) * rayLoss;
+
+    data_type_t* __restrict__ link_ptr = counter_data + (offx * l[0] + offy * l[1] + l[2]);
+
+#define MAYBE_ADD_LINK(u, val) atomicAdd(&link_ptr[u], val)
+    MAYBE_ADD_LINK(0, ay * az * xo);
+    MAYBE_ADD_LINK(1, ay * pos[2] * xo);
+    MAYBE_ADD_LINK(offy, pos[1] * az * xo);
+    MAYBE_ADD_LINK(offy + 1, pos[1] * pos[2] * xo);
+
+    xo = pos[0] * rayLoss;
+    MAYBE_ADD_LINK(offx + 0, ay * az * xo);
+    MAYBE_ADD_LINK(offx + 1, ay * pos[2] * xo);
+    MAYBE_ADD_LINK(offx + offy, pos[1] * az * xo);
+    MAYBE_ADD_LINK(offx + offy + 1, pos[1] * pos[2] * xo);
+#undef MAYBE_ADD_LINK
+}
+
 __device__ __inline__ void trace_ray_cuvol_backward(
-        const svox2::device::PackedSparseGridSpec& __restrict__ grid,
-        const float* __restrict__ grad_output,
-        const float* __restrict__ color_cache,
-        svox2::device::SingleRaySpec& __restrict__ ray,
-        const RenderOptions& __restrict__ opt,
-        uint32_t lane_id,
-        const float* __restrict__ sphfunc_val,
-        float* __restrict__ grad_sphfunc_val,
-        svox2::WarpReducef::TempStorage& __restrict__ temp_storage,
-        float log_transmit_in,
-        float beta_loss,
-        float sparsity_loss,
-        svox2::device::PackedGridOutputGrads& __restrict__ grads,
-        float* __restrict__ accum_out,
-        float* __restrict__ log_transmit_out
-        ) {
+    const svox2::device::PackedSparseGridSpec& __restrict__ grid,
+    const float* __restrict__ grad_output,
+    const float* __restrict__ color_cache,
+    svox2::device::SingleRaySpec& __restrict__ ray,
+    const RenderOptions& __restrict__ opt,
+    uint32_t lane_id,
+    const float* __restrict__ sphfunc_val,
+    float* __restrict__ grad_sphfunc_val,
+    svox2::WarpReducef::TempStorage& __restrict__ temp_storage,
+    float log_transmit_in,
+    float beta_loss,
+    float sparsity_loss,
+    svox2::device::PackedGridOutputGrads& __restrict__ grads,
+    float* __restrict__ counterOutput,
+    float* __restrict__ grad_color_out,
+    int rayLossSpreadType, 
+    float* __restrict__ accum_out,
+    float* __restrict__ log_transmit_out
+) {
     const uint32_t lane_colorgrp_id = lane_id % grid.basis_dim;
     const uint32_t lane_colorgrp = lane_id / grid.basis_dim;
     const uint32_t leader_mask = 1U | (1U << grid.basis_dim) | (1U << (2 * grid.basis_dim));
@@ -46,6 +76,12 @@ __device__ __inline__ void trace_ray_cuvol_backward(
     const float gout = grad_output[lane_colorgrp];
 
     float log_transmit = 0.f;
+
+    float rayLoss = norm3df(
+        color_cache[0] - grad_output[0], 
+        color_cache[1] - grad_output[1], 
+        color_cache[2] - grad_output[2]
+    );
 
     // remat samples
     while (t <= ray.tmax) {
@@ -141,6 +177,13 @@ __device__ __inline__ void trace_ray_cuvol_backward(
                         grid.stride_x,
                         grid.size[2],
                         ray.l, ray.pos, curr_grad_sigma);
+            
+            
+                // spread ray loss to grid counter tensor
+                if (rayLossSpreadType) {
+                    trilerp_backward_counter(counterOutput, grid.stride_x, grid.size[2], ray.l, ray.pos, weight);
+                    trilerp_backward_counter(grad_color_out, grid.stride_x, grid.size[2], ray.l, ray.pos, weight * rayLoss);
+                }
             }
             if (_EXP(log_transmit) < opt.stop_thresh) {
                 break;
@@ -174,6 +217,9 @@ __global__ void pic::render_ray_backward_kernel(
     float beta_loss,
     float sparsity_loss,
     svox2::device::PackedGridOutputGrads grads,
+    float* __restrict__ counterOutput,
+    float* __restrict__ grad_color_out,
+    int rayLossSpreadType, 
     float* __restrict__ accum_out,
     float* __restrict__ log_transmit_out) {
     CUDA_GET_THREAD_ID(tid, int(rays.origins.size(0)) * svox2::WARP_SIZE);
@@ -234,6 +280,9 @@ __global__ void pic::render_ray_backward_kernel(
         beta_loss,
         sparsity_loss,
         grads,
+        counterOutput, 
+        grad_color_out, 
+        rayLossSpreadType, 
         accum_out == nullptr ? nullptr : accum_out + ray_id,
         log_transmit_out == nullptr ? nullptr : log_transmit_out + ray_id);
     svox2::device::calc_sphfunc_backward(

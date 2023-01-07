@@ -640,17 +640,17 @@ while True:
                             # renderEndEvent = torch.cuda.Event(enable_timing=True)
                             # renderStartEvent.record()
 
-                            rgb_pred = grid.volume_render_fused(rays, rgb_gt,
-                                    beta_loss=args.lambda_beta,
-                                    sparsity_loss=args.lambda_sparsity,
-                                    randomize=args.enable_random)
-
-                            # rgb_pred = grid.volume_render_fused_alphaFixed(rays, rgb_gt,
+                            # rgb_pred = grid.volume_render_fused(rays, rgb_gt,
                             #         beta_loss=args.lambda_beta,
                             #         sparsity_loss=args.lambda_sparsity,
                             #         randomize=args.enable_random)
+
+                            rgb_pred, lossGrid, normalizedLossGrid = grid.volume_render_fused_spread_ray_loss(rays, rgb_gt,
+                                beta_loss=args.lambda_beta,
+                                sparsity_loss=args.lambda_sparsity,
+                                randomize=args.enable_random)
                             
-                            rayLossTemp = ((rgb_pred - rgb_gt)**2).mean(dim=1)
+                            rayLossTemp = ((rgb_pred - rgb_gt)**2).sum(dim=1)**0.5
 
                             tmpResult = rayCounter.count(rays, rayLoss=rayLossTemp)
                             # rayCounter.count(rays)
