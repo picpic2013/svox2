@@ -650,9 +650,11 @@ while True:
                                 sparsity_loss=args.lambda_sparsity,
                                 randomize=args.enable_random)
                             
-                            rayLossTemp = ((rgb_pred - rgb_gt)**2).sum(dim=1)**0.5
+                            rayLossTemp = ((rgb_pred - rgb_gt)**2).sum(dim=1)
 
-                            tmpResult = rayCounter.count(rays, rayLoss=rayLossTemp)
+                            tmpResult1 = rayCounter.count(rays, rayLoss=rayLossTemp)
+                            tmpResult2 = rayCounter.count(rays, rayLoss=torch.ones_like(rayLossTemp), addToTotal=False)
+                            lossGrid_py, normalizedLossGrid_py = tmpResult1['rayloss'], tmpResult2['rayloss']
                             # rayCounter.count(rays)
 
                             if doTopKOp:

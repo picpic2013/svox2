@@ -47,6 +47,7 @@ __device__ __inline__ void trace_ray_cuvol_backward(
     float* __restrict__ counterOutput,
     float* __restrict__ grad_color_out,
     int rayLossSpreadType, 
+    float rayLoss, 
     float* __restrict__ accum_out,
     float* __restrict__ log_transmit_out
 ) {
@@ -76,12 +77,6 @@ __device__ __inline__ void trace_ray_cuvol_backward(
     const float gout = grad_output[lane_colorgrp];
 
     float log_transmit = 0.f;
-
-    float rayLoss = norm3df(
-        color_cache[0] - grad_output[0], 
-        color_cache[1] - grad_output[1], 
-        color_cache[2] - grad_output[2]
-    );
 
     // remat samples
     while (t <= ray.tmax) {
@@ -208,8 +203,8 @@ __device__ __inline__ void trace_ray_cuvol_backward(
 __launch_bounds__(svox2::TRACE_RAY_BKWD_CUDA_THREADS, svox2::MIN_BLOCKS_PER_SM)
 __global__ void pic::render_ray_backward_kernel(
     svox2::device::PackedSparseGridSpec grid,
-    const float* __restrict__ grad_output,
-    const float* __restrict__ color_cache,
+    const float* __restrict__ grad_output, // GT
+    const float* __restrict__ color_cache, // OUT
     svox2::device::PackedRaysSpec rays,
     RenderOptions opt,
     bool grad_out_is_rgb,
@@ -251,17 +246,21 @@ __global__ void pic::render_ray_backward_kernel(
     }
 
     float grad_out[3];
+    float rayMSELoss = 0.;
     if (grad_out_is_rgb) {
         const float norm_factor = 2.f / (3 * int(rays.origins.size(0)));
 #pragma unroll 3
         for (int i = 0; i < 3; ++i) {
             const float resid = color_cache[ray_id * 3 + i] - grad_output[ray_id * 3 + i];
             grad_out[i] = resid * norm_factor;
+            rayMSELoss += resid * resid;
         }
     } else {
 #pragma unroll 3
         for (int i = 0; i < 3; ++i) {
+            const float resid = color_cache[ray_id * 3 + i] - grad_output[ray_id * 3 + i];
             grad_out[i] = grad_output[ray_id * 3 + i];
+            rayMSELoss += resid * resid;
         }
     }
 
@@ -283,6 +282,7 @@ __global__ void pic::render_ray_backward_kernel(
         counterOutput, 
         grad_color_out, 
         rayLossSpreadType, 
+        rayMSELoss, 
         accum_out == nullptr ? nullptr : accum_out + ray_id,
         log_transmit_out == nullptr ? nullptr : log_transmit_out + ray_id);
     svox2::device::calc_sphfunc_backward(
